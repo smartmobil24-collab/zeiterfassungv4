@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16324f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Zeiterfassung">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon.svg">
+<title>Zeiterfassung – Polat Transfer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/config.js"></script>
+<style>
+:root{
+  --ink:#16324f; --amber:#f2a900; --go:#1f7a4d; --stop:#c8322b;
+  --bg:#eef1f4; --card:#fff; --card2:#f6f8fa; --line:#d9dfe6;
+  --text:#14202c; --mute:#5b6878; --faint:#9aa5b1;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1620;--card:#16212d;--card2:#1c2936;--line:#2a3846;--text:#e6ecf2;--mute:#94a3b4;--faint:#5a6878;}}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:Barlow,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:16px;line-height:1.45}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+.screen{display:none;min-height:100%}
+.screen.on{display:flex;flex-direction:column}
+.wrap{width:100%;max-width:520px;margin:0 auto;padding:16px}
+header{background:var(--ink);color:#fff;padding:calc(var(--sat) + 14px) 16px 14px;display:flex;align-items:center;gap:12px}
+header h1{font-family:"Barlow Semi Condensed",Barlow,sans-serif;font-size:20px;font-weight:700;flex:1;letter-spacing:.2px}
+header small{display:block;font-family:Barlow,sans-serif;font-weight:500;font-size:13px;opacity:.75}
+.hbtn{color:#fff;opacity:.85;padding:6px 10px;border:1px solid rgba(255,255,255,.3);border-radius:8px;font-size:14px}
+nav{display:flex;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+nav button{flex:1;padding:13px 6px;font-weight:600;color:var(--mute);border-bottom:3px solid transparent}
+nav button.on{color:var(--ink);border-bottom-color:var(--amber)}
+@media (prefers-color-scheme:dark){nav button.on{color:#fff}}
+.panel{display:none}.panel.on{display:block}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.box h2{font-size:16px;font-weight:700;margin-bottom:10px}
+label{display:block;font-size:14px;font-weight:600;color:var(--mute);margin:10px 0 4px}
+input,select{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card2);font-size:16px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{display:block;width:100%;padding:14px;border-radius:12px;font-weight:700;font-size:16px;background:var(--ink);color:#fff;margin-top:14px}
+.btn:disabled{opacity:.5}
+.err{color:var(--stop);font-weight:600;font-size:14px;margin-top:8px;white-space:pre-wrap}
+.hint{font-size:14px;color:var(--mute)}
+/* Uhr */
+.clock{text-align:center;padding:26px 16px 22px}
+.clock .t{font-family:"Barlow Semi Condensed",sans-serif;font-weight:700;font-size:64px;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.clock .d{color:var(--mute);margin-top:6px}
+.state{display:inline-flex;align-items:center;gap:8px;margin-top:16px;padding:7px 14px;border-radius:999px;font-weight:700;font-size:15px;background:var(--card2)}
+.state i{width:10px;height:10px;border-radius:50%;background:var(--faint)}
+.state.working i{background:var(--go)} .state.pause i{background:var(--amber)}
+.state.working{color:var(--go)} .state.pause{color:#a87400}
+@media (prefers-color-scheme:dark){.state.pause{color:var(--amber)}}
+.since{margin-top:10px;color:var(--mute);font-size:15px;font-variant-numeric:tabular-nums}
+/* Stempeltasten */
+.stamps{display:grid;gap:12px;margin-bottom:14px}
+.stamp{padding:22px 16px;border-radius:16px;font-family:"Barlow Semi Condensed",sans-serif;font-size:24px;font-weight:700;color:#fff;text-align:left;display:flex;justify-content:space-between;align-items:center}
+.stamp span{font-family:Barlow,sans-serif;font-size:14px;font-weight:500;opacity:.85}
+.s-in{background:var(--go)} .s-pause{background:var(--amber);color:#2a1d00} .s-resume{background:var(--go)} .s-out{background:var(--stop)}
+.stamp:active{transform:scale(.985)}
+/* Liste */
+.entry{padding:12px 0;border-top:1px solid var(--line)}
+.entry:first-child{border-top:0}
+.entry .top{display:flex;justify-content:space-between;font-weight:700}
+.entry .sub{font-size:14px;color:var(--mute);margin-top:2px}
+.tot{display:flex;justify-content:space-between;font-weight:700;padding-top:12px;border-top:2px solid var(--ink);margin-top:6px}
+.empty{color:var(--mute);text-align:center;padding:18px 0}
+.toast{position:fixed;left:50%;bottom:calc(var(--sab) + 20px);transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;max-width:90%}
+.toast.on{opacity:1}
+.logo{text-align:center;margin:40px 0 20px}
+.logo b{font-family:"Barlow Semi Condensed",sans-serif;font-size:30px;display:block}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div class="screen" id="s-setup">
+  <div class="wrap">
+    <div class="logo"><b>Zeiterfassung</b><span class="hint">Einmalige Einrichtung</span></div>
+    <div class="box">
+      <h2>Verbindung zur Datenbank</h2>
+      <p class="hint">Am einfachsten: den Mitarbeiter-Link aus der Admin-App öffnen. Dann ist alles schon eingetragen.</p>
+      <label for="c-url">Supabase Project URL</label>
+      <input id="c-url" placeholder="https://xxxx.supabase.co" autocomplete="off">
+      <label for="c-key">Supabase Key (anon oder publishable)</label>
+      <input id="c-key" placeholder="eyJ… oder sb_publishable_…" autocomplete="off">
+      <button class="btn" id="c-save" onclick="saveConfig()">Verbinden</button>
+      <div class="err" id="c-err"></div>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div class="screen" id="s-login">
+  <div class="wrap">
+    <div class="logo"><b>Zeiterfassung</b><span class="hint">Polat Transfer</span></div>
+    <div class="box">
+      <h2>Wer bist du?</h2>
+      <label for="l-v">Vorname</label><input id="l-v" autocomplete="given-name">
+      <label for="l-n">Nachname</label><input id="l-n" autocomplete="family-name">
+      <button class="btn" onclick="doLogin()">Weiter</button>
+      <div class="err" id="l-err"></div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="screen" id="s-app">
+  <header>
+    <h1>Zeiterfassung<small id="h-name"></small></h1>
+    <button class="hbtn" onclick="doLogout()">Abmelden</button>
+  </header>
+  <nav>
+    <button class="on" data-tab="stamp" onclick="tab('stamp')">Stempeln</button>
+    <button data-tab="hist" onclick="tab('hist')">Meine Zeiten</button>
+    <button data-tab="add" onclick="tab('add')">Nachtragen</button>
+  </nav>
+
+  <div class="wrap">
+    <div class="panel on" id="p-stamp">
+      <div class="box clock">
+        <div class="t" id="clk">--:--</div>
+        <div class="d" id="clk-d"></div>
+        <div class="state" id="st"><i></i><b id="st-t">Nicht gestempelt</b></div>
+        <div class="since" id="since"></div>
+      </div>
+      <div class="stamps" id="stamps"></div>
+      <div class="box"><h2>Heute</h2><div id="today"></div></div>
+    </div>
+
+    <div class="panel" id="p-hist">
+      <div class="box">
+        <label for="h-m" style="margin-top:0">Monat</label>
+        <input type="month" id="h-m" onchange="loadHist()">
+      </div>
+      <div class="box" id="hist"></div>
+    </div>
+
+    <div class="panel" id="p-add">
+      <div class="box">
+        <h2>Vergessene Zeit nachtragen</h2>
+        <label for="a-d">Datum</label><input type="date" id="a-d">
+        <div class="row">
+          <div><label for="a-in">Kommen</label><input type="time" id="a-in"></div>
+          <div><label for="a-out">Gehen</label><input type="time" id="a-out"></div>
+        </div>
+        <div class="row">
+          <div><label for="a-ps">Pause von</label><input type="time" id="a-ps"></div>
+          <div><label for="a-pe">Pause bis</label><input type="time" id="a-pe"></div>
+        </div>
+        <label for="a-note">Notiz (optional)</label><input id="a-note">
+        <button class="btn" onclick="saveManual()">Eintrag speichern</button>
+        <div class="err" id="a-err"></div>
+        <p class="hint" style="margin-top:10px">Korrekturen an bestehenden Einträgen macht der Chef in der Admin-App.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const hm=iso=>{if(!iso)return'–';const d=new Date(iso);return pad(d.getHours())+':'+pad(d.getMinutes())};
+const fmt=m=>{m=Math.max(0,Math.round(m||0));return Math.floor(m/60)+':'+pad(m%60)+' Std'};
+const dDE=s=>{const [y,m,d]=s.split('-');return `${d}.${m}.${y}`};
+const WD=['So','Mo','Di','Mi','Do','Fr','Sa'];
+const mins=(a,b)=>(new Date(b)-new Date(a))/60000;
+let sb=null, me=null, active=null, openPause=null;
+
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),2400)}
+function show(s){document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('on',x.id==='s-'+s))}
+function tab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+t));if(t==='hist')loadHist()}
+function getCfg(){const z=window.ZE_CONFIG||{};if(z.url&&z.key)return {url:z.url.replace(/\/+$/,''),key:z.key};try{return JSON.parse(localStorage.getItem('ptn_cfg')||'null')}catch(e){return null}}
+function errText(e){if(!e)return'';const m=e.message||String(e);if(/fetch/i.test(m))return'Keine Verbindung. Internet und Supabase-URL prüfen.';if(/Invalid API key|JWT|apikey/i.test(m))return'Supabase-Key ist falsch. Den „anon public“ oder „publishable“ Key nehmen.';if(/pausen/i.test(m)&&/exist|schema cache/i.test(m))return'Tabelle „pausen“ fehlt. Bitte SQL-SETUP.txt in Supabase ausführen.';return m}
+
+// Pausenminuten eines Eintrags (aus Pausen-Tabelle, sonst altes Feld)
+function pauseMin(e,now){
+  const p=e.pausen||[];
+  if(p.length)return p.reduce((s,x)=>s+mins(x.start_time,x.end_time||now||new Date()),0);
+  return e.pause_min||0;
+}
+function workMin(e,now){
+  if(!e.start_time)return 0;
+  const end=e.end_time||now||new Date();
+  return Math.max(0,mins(e.start_time,end)-pauseMin(e,now));
+}
+function pauseText(e){
+  const p=(e.pausen||[]).slice().sort((a,b)=>a.start_time.localeCompare(b.start_time));
+  if(p.length)return p.map(x=>hm(x.start_time)+'–'+(x.end_time?hm(x.end_time):'…')).join(', ');
+  return e.pause_min?e.pause_min+' Min':'';
+}
+
+async function init(){
+  const q=new URLSearchParams(location.search);
+  if(q.get('u')&&q.get('k')){localStorage.setItem('ptn_cfg',JSON.stringify({url:q.get('u'),key:q.get('k')}));history.replaceState(null,'',location.pathname)}
+  const c=getCfg();
+  if(!c){show('setup');return}
+  sb=supabase.createClient(c.url,c.key);
+  me=JSON.parse(localStorage.getItem('ptn_me')||'null');
+  if(!me){show('login');return}
+  enterApp();
+}
+
+async function saveConfig(){
+  const url=$('c-url').value.trim().replace(/\/+$/,''), key=$('c-key').value.trim();
+  $('c-err').textContent='';
+  if(!/^https:\/\/.+/.test(url)||!key){$('c-err').textContent='URL und Key eintragen.';return}
+  $('c-save').disabled=true;
+  try{
+    const t=supabase.createClient(url,key);
+    const {error}=await t.from('pt_mitarbeiter').select('id').limit(1);
+    if(error)throw error;
+    localStorage.setItem('ptn_cfg',JSON.stringify({url,key}));
+    init();
+  }catch(e){$('c-err').textContent=errText(e)}
+  $('c-save').disabled=false;
+}
+
+async function doLogin(){
+  const v=$('l-v').value.trim(), n=$('l-n').value.trim();
+  $('l-err').textContent='';
+  if(!v||!n){$('l-err').textContent='Vor- und Nachname eintragen.';return}
+  const name=(v+' '+n).replace(/\s+/g,' ');
+  try{
+    let {data,error}=await sb.from('pt_mitarbeiter').select('id,name').ilike('name',name).limit(1);
+    if(error)throw error;
+    let row=data[0];
+    if(!row){const r=await sb.from('pt_mitarbeiter').insert({name}).select('id,name').single();if(r.error)throw r.error;row=r.data}
+    me=row;localStorage.setItem('ptn_me',JSON.stringify(me));enterApp();
+  }catch(e){$('l-err').textContent=errText(e)}
+}
+function doLogout(){if(!confirm('Abmelden? Gestempelte Zeiten bleiben gespeichert.'))return;localStorage.removeItem('ptn_me');me=null;show('login')}
+
+function enterApp(){
+  show('app');$('h-name').textContent=me.name;
+  const now=new Date();$('h-m').value=now.toISOString().slice(0,7);$('a-d').value=ymd(now);
+  tick();setInterval(tick,1000);refresh();
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
+}
+function tick(){
+  const n=new Date();
+  $('clk').textContent=pad(n.getHours())+':'+pad(n.getMinutes());
+  $('clk-d').textContent=n.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  if(active){
+    let t='Arbeitszeit '+fmt(workMin(active,n))+' · seit '+hm(active.start_time);
+    if(active.status==='pause'&&openPause)t='Pause seit '+hm(openPause.start_time)+' ('+Math.floor(mins(openPause.start_time,n))+' Min)';
+    $('since').textContent=t;
+  }else $('since').textContent='';
+}
+
+async function refresh(){
+  try{
+    const {data,error}=await sb.from('pt_zeiten').select('*,pausen:pt_pausen(*)').eq('mitarbeiter_id',me.id).in('status',['working','pause']).order('start_time',{ascending:false}).limit(1);
+    if(error)throw error;
+    active=data[0]||null;
+    openPause=active?(active.pausen||[]).find(p=>!p.end_time)||null:null;
+    if(active&&active.status==='pause'&&!openPause&&active.pause_start)openPause={id:null,start_time:active.pause_start};
+    renderState();loadToday();
+  }catch(e){toast(errText(e))}
+}
+function renderState(){
+  const st=$('st'), s=active?active.status:'idle';
+  st.className='state '+(s==='idle'?'':s);
+  $('st-t').textContent=s==='working'?'Bei der Arbeit':s==='pause'?'In der Pause':'Nicht gestempelt';
+  let h='';
+  if(!active)h=`<button class="stamp s-in" onclick="kommen()">Kommen<span>Arbeit beginnen</span></button>`;
+  else if(s==='working')h=`<button class="stamp s-pause" onclick="pauseStart()">Pause beginnen<span>Pause stempeln</span></button><button class="stamp s-out" onclick="gehen()">Gehen<span>Feierabend</span></button>`;
+  else h=`<button class="stamp s-resume" onclick="pauseEnde()">Pause beenden<span>Weiterarbeiten</span></button><button class="stamp s-out" onclick="gehen()">Gehen<span>Feierabend</span></button>`;
+  $('stamps').innerHTML=h;tick();
+}
+let busy=false;
+async function act(fn,msg){if(busy)return;busy=true;try{await fn();toast(msg)}catch(e){toast(errText(e))}busy=false;await refresh()}
+
+function kommen(){act(async()=>{
+  const n=new Date();
+  const {error}=await sb.from('pt_zeiten').insert({mitarbeiter_id:me.id,mitarbeiter_name:me.name,datum:ymd(n),start_time:n.toISOString(),status:'working',pause_min:0});
+  if(error)throw error;
+},'Kommen gestempelt: '+hm(new Date().toISOString()))}
+
+function pauseStart(){act(async()=>{
+  const n=new Date().toISOString();
+  let r=await sb.from('pt_pausen').insert({eintrag_id:active.id,start_time:n});if(r.error)throw r.error;
+  r=await sb.from('pt_zeiten').update({status:'pause',pause_start:n}).eq('id',active.id);if(r.error)throw r.error;
+},'Pause beginnt: '+hm(new Date().toISOString()))}
+
+async function closePause(nIso){
+  if(!openPause)return;
+  if(openPause.id){const r=await sb.from('pt_pausen').update({end_time:nIso}).eq('id',openPause.id);if(r.error)throw r.error}
+  else{const r=await sb.from('pt_pausen').insert({eintrag_id:active.id,start_time:openPause.start_time,end_time:nIso});if(r.error)throw r.error}
+  const p=(active.pausen||[]).filter(x=>x.id!==openPause.id).concat([{start_time:openPause.start_time,end_time:nIso}]);
+  const pm=Math.round(p.reduce((s,x)=>s+mins(x.start_time,x.end_time),0));
+  const r=await sb.from('pt_zeiten').update({status:'working',pause_start:null,pause_min:pm}).eq('id',active.id);if(r.error)throw r.error;
+  active.pausen=p;active.pause_min=pm;openPause=null;
+}
+function pauseEnde(){act(async()=>{await closePause(new Date().toISOString())},'Pause beendet – weiter geht’s')}
+
+function gehen(){
+  if(!confirm('Feierabend stempeln?'))return;
+  act(async()=>{
+    const n=new Date().toISOString();
+    if(active.status==='pause')await closePause(n);
+    const e={...active,end_time:n};
+    const {error}=await sb.from('pt_zeiten').update({end_time:n,status:'done',pause_start:null,pause_min:Math.round(pauseMin(e)),dauer_min:Math.round(workMin(e))}).eq('id',active.id);
+    if(error)throw error;
+  },'Gehen gestempelt. Schönen Feierabend!');
+}
+
+function entryHtml(e,showDate){
+  const pt=pauseText(e);
+  return `<div class="entry"><div class="top"><span>${showDate?WD[new Date(e.datum+'T12:00').getDay()]+', '+dDE(e.datum)+' · ':''}${hm(e.start_time)} – ${e.end_time?hm(e.end_time):'läuft'}</span><span>${fmt(workMin(e))}</span></div>${pt?`<div class="sub">Pause: ${pt}</div>`:''}${e.notiz?`<div class="sub">${esc(e.notiz)}</div>`:''}</div>`;
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+async function loadToday(){
+  const {data,error}=await sb.from('pt_zeiten').select('*,pausen:pt_pausen(*)').eq('mitarbeiter_id',me.id).eq('datum',ymd(new Date())).order('start_time');
+  if(error){$('today').innerHTML=`<div class="err">${esc(errText(error))}</div>`;return}
+  $('today').innerHTML=data.length?data.map(e=>entryHtml(e,false)).join(''):'<div class="empty">Heute noch nichts gestempelt.</div>';
+}
+async function loadHist(){
+  const m=$('h-m').value;if(!m)return;
+  const [y,mo]=m.split('-').map(Number);
+  const from=`${m}-01`, to=ymd(new Date(y,mo,1));
+  const {data,error}=await sb.from('pt_zeiten').select('*,pausen:pt_pausen(*)').eq('mitarbeiter_id',me.id).gte('datum',from).lt('datum',to).order('datum').order('start_time');
+  if(error){$('hist').innerHTML=`<div class="err">${esc(errText(error))}</div>`;return}
+  if(!data.length){$('hist').innerHTML='<div class="empty">Keine Einträge in diesem Monat.</div>';return}
+  const w=data.reduce((s,e)=>s+workMin(e),0), p=data.reduce((s,e)=>s+pauseMin(e),0);
+  $('hist').innerHTML=data.map(e=>entryHtml(e,true)).join('')+`<div class="tot"><span>Gesamt Arbeitszeit</span><span>${fmt(w)}</span></div><div class="tot" style="border-top:0;padding-top:4px;color:var(--mute)"><span>Gesamt Pause</span><span>${fmt(p)}</span></div>`;
+}
+
+async function saveManual(){
+  const d=$('a-d').value, i=$('a-in').value, o=$('a-out').value, ps=$('a-ps').value, pe=$('a-pe').value;
+  $('a-err').textContent='';
+  if(!d||!i||!o){$('a-err').textContent='Datum, Kommen und Gehen eintragen.';return}
+  if((ps&&!pe)||(!ps&&pe)){$('a-err').textContent='Pause von und bis beide eintragen oder beide leer lassen.';return}
+  const start=new Date(d+'T'+i), end=new Date(d+'T'+o);
+  if(end<=start)end.setDate(end.getDate()+1);
+  let pausen=[];
+  if(ps){
+    const a=new Date(d+'T'+ps), b=new Date(d+'T'+pe);
+    if(a<start)a.setDate(a.getDate()+1); if(b<=a)b.setDate(b.getDate()+1);
+    if(a<start||b>end){$('a-err').textContent='Die Pause muss zwischen Kommen und Gehen liegen.';return}
+    pausen=[{start_time:a.toISOString(),end_time:b.toISOString()}];
+  }
+  const e={start_time:start.toISOString(),end_time:end.toISOString(),pausen};
+  try{
+    const r=await sb.from('pt_zeiten').insert({mitarbeiter_id:me.id,mitarbeiter_name:me.name,datum:d,start_time:e.start_time,end_time:e.end_time,status:'done',manuell:true,pause_min:Math.round(pauseMin(e)),dauer_min:Math.round(workMin(e)),notiz:$('a-note').value.trim()||null}).select('id').single();
+    if(r.error)throw r.error;
+    if(pausen.length){const r2=await sb.from('pt_pausen').insert(pausen.map(p=>({...p,eintrag_id:r.data.id})));if(r2.error)throw r2.error}
+    toast('Eintrag gespeichert');['a-in','a-out','a-ps','a-pe','a-note'].forEach(x=>$(x).value='');loadToday();
+  }catch(err){$('a-err').textContent=errText(err)}
+}
+
+init();
+</script>
+</body>
+</html>

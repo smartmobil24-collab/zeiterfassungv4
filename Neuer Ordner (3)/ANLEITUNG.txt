@@ -1,0 +1,32 @@
+ZEITERFASSUNG POLAT TRANSFER – VERCEL
+
+Eine Seite für alles:
+  deine-seite.vercel.app          -> Fahrer stempeln
+  deine-seite.vercel.app/admin    -> du (mit PIN)
+
+1) DATENBANK (einmalig)
+   supabase.com -> dein Projekt öffnen (das bestehende geht auch, neue Tabellen mit pt_ stören die alte App nicht)
+   SQL Editor -> Inhalt von SQL-SETUP.txt einfügen -> Run
+
+2) DATEIEN ZU GITHUB (Vercel braucht GitHub)
+   github.com -> oben rechts "+" -> New repository
+   Name: zeiterfassung -> Private -> Create repository
+   Auf "uploading an existing file" klicken
+   Den INHALT des Ordners "site" hineinziehen
+   (index.html, config.js, vercel.json, manifest.json, icon.svg UND den Ordner admin)
+   -> Commit changes
+
+3) VERCEL
+   vercel.com -> Add New -> Project -> GitHub-Repo "zeiterfassung" -> Import
+   Framework Preset: Other -> Deploy
+   Nach ca. 30 Sekunden bekommst du deine Adresse.
+
+4) EINRICHTEN
+   deine-seite.vercel.app/admin öffnen
+   -> Supabase Project URL + Key (anon public / publishable) eintragen
+   -> PIN festlegen
+   -> Einstellungen -> "Link kopieren" -> per WhatsApp an die Fahrer
+
+Optional statt Schritt 4: In config.js URL und Key eintragen
+(auf GitHub: Datei öffnen -> Stift -> eintragen -> Commit).
+Dann ist alles automatisch verbunden, auch ohne Fahrer-Link.

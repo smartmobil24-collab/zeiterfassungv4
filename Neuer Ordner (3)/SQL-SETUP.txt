@@ -1,0 +1,36 @@
+CREATE TABLE pt_mitarbeiter (
+  id bigint generated always as identity primary key,
+  name text unique not null,
+  created_at timestamptz default now()
+);
+CREATE TABLE pt_zeiten (
+  id bigint generated always as identity primary key,
+  mitarbeiter_id bigint not null references pt_mitarbeiter(id) on delete cascade,
+  mitarbeiter_name text not null,
+  datum date not null,
+  start_time timestamptz,
+  end_time timestamptz,
+  pause_start timestamptz,
+  pause_min int default 0,
+  dauer_min int,
+  status text default 'working',
+  notiz text,
+  manuell boolean default false,
+  created_at timestamptz default now()
+);
+CREATE TABLE pt_pausen (
+  id bigint generated always as identity primary key,
+  eintrag_id bigint not null references pt_zeiten(id) on delete cascade,
+  start_time timestamptz not null,
+  end_time timestamptz,
+  created_at timestamptz default now()
+);
+ALTER TABLE pt_mitarbeiter DISABLE ROW LEVEL SECURITY;
+ALTER TABLE pt_zeiten DISABLE ROW LEVEL SECURITY;
+ALTER TABLE pt_pausen DISABLE ROW LEVEL SECURITY;
+CREATE INDEX ON pt_zeiten(mitarbeiter_id, datum);
+CREATE INDEX ON pt_zeiten(datum);
+CREATE INDEX ON pt_pausen(eintrag_id);
+GRANT ALL ON TABLE pt_mitarbeiter, pt_zeiten, pt_pausen TO anon, authenticated;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+NOTIFY pgrst, 'reload schema';

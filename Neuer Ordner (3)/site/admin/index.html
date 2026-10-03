@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16324f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ZE Admin">
+<link rel="manifest" href="/admin/manifest.json">
+<link rel="icon" href="/admin/icon.svg">
+<link rel="apple-touch-icon" href="/admin/icon.svg">
+<title>Admin – Zeiterfassung Polat Transfer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+:root{
+  --ink:#16324f; --amber:#f2a900; --go:#1f7a4d; --stop:#c8322b;
+  --bg:#eef1f4; --card:#fff; --card2:#f6f8fa; --line:#d9dfe6;
+  --text:#14202c; --mute:#5b6878; --faint:#9aa5b1;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1620;--card:#16212d;--card2:#1c2936;--line:#2a3846;--text:#e6ecf2;--mute:#94a3b4;--faint:#5a6878;}}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:Barlow,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:16px;line-height:1.45}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+.screen{display:none;min-height:100%}
+.screen.on{display:flex;flex-direction:column}
+.wrap{width:100%;max-width:860px;margin:0 auto;padding:16px 16px calc(var(--sab) + 24px)}
+.narrow{max-width:480px}
+header{background:var(--ink);color:#fff;padding:calc(var(--sat) + 14px) 16px 14px;display:flex;align-items:center;gap:12px}
+header h1{font-family:"Barlow Semi Condensed",Barlow,sans-serif;font-size:20px;font-weight:700;flex:1}
+header small{display:block;font-family:Barlow,sans-serif;font-weight:500;font-size:13px;opacity:.75}
+.hbtn{color:#fff;padding:6px 10px;border:1px solid rgba(255,255,255,.3);border-radius:8px;font-size:14px}
+nav{display:flex;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;overflow-x:auto}
+nav button{flex:1;padding:13px 10px;font-weight:600;color:var(--mute);border-bottom:3px solid transparent;white-space:nowrap}
+nav button.on{color:var(--ink);border-bottom-color:var(--amber)}
+@media (prefers-color-scheme:dark){nav button.on{color:#fff}}
+.panel{display:none}.panel.on{display:block}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.box h2{font-size:17px;font-weight:700;margin-bottom:8px}
+label{display:block;font-size:14px;font-weight:600;color:var(--mute);margin:10px 0 4px}
+input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card2);font-size:16px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 16px;border-radius:10px;font-weight:700;background:var(--ink);color:#fff}
+.btn.full{width:100%;margin-top:14px;padding:14px}
+.btn.ghost{background:var(--card2);color:var(--text);border:1px solid var(--line)}
+.btn.danger{background:var(--stop)}
+.btn.amber{background:var(--amber);color:#2a1d00}
+.btn:disabled{opacity:.5}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.chip{padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card2);font-size:14px;font-weight:600}
+.err{color:var(--stop);font-weight:600;font-size:14px;margin-top:8px;white-space:pre-wrap}
+.hint{font-size:14px;color:var(--mute)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.toolbar .sp{flex:1}
+/* Live */
+.live{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:12px 0;border-top:1px solid var(--line)}
+.live:first-of-type{border-top:0}
+.live b{font-size:16px}
+.badge{font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px;align-self:start;background:var(--card2);color:var(--mute)}
+.badge.working{background:rgba(31,122,77,.14);color:var(--go)}
+.badge.pause{background:rgba(242,169,0,.2);color:#8a5f00}
+.badge.done{background:rgba(22,50,79,.1);color:var(--ink)}
+@media (prefers-color-scheme:dark){.badge.pause{color:var(--amber)}.badge.done{color:#b9cbe0}}
+.live .sub{grid-column:1/-1;font-size:14px;color:var(--mute)}
+/* Ordner */
+.folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.folder{position:relative;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:4px 14px 14px 14px;padding:18px 16px 14px;margin-top:10px}
+.folder::before{content:"";position:absolute;top:-10px;left:-1px;width:42%;height:12px;background:var(--card);border:1px solid var(--line);border-bottom:0;border-radius:8px 8px 0 0}
+.folder::after{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:var(--amber);border-radius:0 14px 0 0}
+.folder .mname{font-family:"Barlow Semi Condensed",sans-serif;font-size:22px;font-weight:700;color:var(--ink)}
+@media (prefers-color-scheme:dark){.folder .mname{color:#fff}}
+.folder .meta{font-size:14px;color:var(--mute);margin-top:4px}
+.folder .hrs{font-size:15px;font-weight:700;margin-top:8px}
+.folder:hover{border-color:var(--ink)}
+/* Monatsansicht */
+.mhead{font-family:"Barlow Semi Condensed",sans-serif;font-size:28px;font-weight:700;margin:4px 0 10px}
+.sum{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 2px}
+.sum div{font-size:14px;color:var(--mute)}
+.sum b{display:block;font-size:20px;color:var(--text);font-variant-numeric:tabular-nums}
+.tbl{width:100%;border-collapse:collapse;font-size:15px}
+.tbl th{text-align:left;font-size:13px;color:var(--mute);font-weight:600;padding:8px 6px;border-bottom:2px solid var(--line);white-space:nowrap}
+.tbl td{padding:10px 6px;border-bottom:1px solid var(--line);vertical-align:top;font-variant-numeric:tabular-nums}
+.tbl td.r,.tbl th.r{text-align:right}
+.tbl tfoot td{font-weight:700;border-bottom:0;border-top:2px solid var(--ink)}
+.act{display:flex;gap:6px;justify-content:flex-end}
+.act button{padding:6px 10px;border-radius:8px;border:1px solid var(--line);font-size:13px;font-weight:600;background:var(--card2)}
+.act button.del{color:var(--stop)}
+.scrollx{overflow-x:auto}
+.permat{display:grid;grid-template-columns:1fr auto auto;gap:4px 16px;font-size:15px;margin-top:8px}
+.permat span:nth-child(3n+2),.permat span:nth-child(3n){text-align:right;font-variant-numeric:tabular-nums}
+.permat .h{font-size:13px;color:var(--mute);font-weight:600}
+@media (max-width:640px){
+  .tbl thead{display:none}
+  .tbl tr{display:grid;grid-template-columns:1fr auto;border-bottom:1px solid var(--line);padding:8px 0}
+  .tbl td{border:0;padding:2px 0}
+  .tbl td.c-name{grid-column:1/-1;font-weight:700}
+  .tbl td.c-pause,.tbl td.c-note{grid-column:1/-1;color:var(--mute);font-size:14px}
+  .tbl td.c-act{grid-column:1/-1}
+  .tbl tfoot tr{border:0}
+}
+/* Modal */
+.modal{position:fixed;inset:0;background:rgba(10,20,30,.55);display:none;align-items:flex-end;justify-content:center;z-index:40}
+.modal.on{display:flex}
+.sheet{background:var(--card);width:100%;max-width:520px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:18px 16px calc(var(--sab) + 18px)}
+@media (min-width:640px){.modal{align-items:center}.sheet{border-radius:18px}}
+.prow{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;margin-top:6px}
+.prow button{padding:11px 12px;border-radius:10px;border:1px solid var(--line);color:var(--stop);font-weight:700}
+.toast{position:fixed;left:50%;bottom:calc(var(--sab) + 20px);transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;max-width:90%}
+.toast.on{opacity:1}
+.logo{text-align:center;margin:40px 0 20px}
+.logo b{font-family:"Barlow Semi Condensed",sans-serif;font-size:30px;display:block}
+.pin{letter-spacing:10px;text-align:center;font-size:26px}
+.link{word-break:break-all;font-size:13px;background:var(--card2);padding:10px;border-radius:10px;margin-top:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div class="screen" id="s-setup">
+  <div class="wrap narrow">
+    <div class="logo"><b>Zeiterfassung Admin</b><span class="hint">Einmalige Einrichtung</span></div>
+    <div class="box">
+      <h2>Verbindung zur Datenbank</h2>
+      <p class="hint">Supabase → Project Settings → API. Die Project URL und den Key „anon public“ (oder „publishable“) kopieren. Nicht den „service_role“/„secret“ Key.</p>
+      <label for="c-url">Supabase Project URL</label>
+      <input id="c-url" placeholder="https://xxxx.supabase.co" autocomplete="off">
+      <label for="c-key">Supabase Key</label>
+      <input id="c-key" placeholder="eyJ… oder sb_publishable_…" autocomplete="off">
+      <button class="btn full" id="c-save" onclick="saveConfig()">Verbinden und prüfen</button>
+      <div class="err" id="c-err"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PIN -->
+<div class="screen" id="s-pin">
+  <div class="wrap narrow">
+    <div class="logo"><b>Zeiterfassung Admin</b><span class="hint" id="pin-hint">PIN eingeben</span></div>
+    <div class="box">
+      <label for="pin1" id="pin1-l" style="margin-top:0">PIN</label>
+      <input id="pin1" class="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off">
+      <div id="pin2-w" style="display:none"><label for="pin2">PIN wiederholen</label><input id="pin2" class="pin" type="password" inputmode="numeric" maxlength="8"></div>
+      <button class="btn full" onclick="pinGo()" id="pin-btn">Entsperren</button>
+      <div class="err" id="pin-err"></div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="screen" id="s-app">
+  <header>
+    <h1>Zeiterfassung<small>Polat Transfer · Admin</small></h1>
+    <button class="hbtn" onclick="lock()">Sperren</button>
+  </header>
+  <nav>
+    <button class="on" data-tab="live" onclick="tab('live')">Heute</button>
+    <button data-tab="months" onclick="tab('months')">Monatsordner</button>
+    <button data-tab="export" onclick="tab('export')">Excel-Export</button>
+    <button data-tab="set" onclick="tab('set')">Einstellungen</button>
+  </nav>
+
+  <div class="wrap">
+    <!-- HEUTE -->
+    <div class="panel on" id="p-live">
+      <div class="toolbar"><h2 class="sp" id="live-d" style="font-size:18px"></h2><button class="btn ghost" onclick="loadLive()">Aktualisieren</button></div>
+      <div class="box" id="live"></div>
+    </div>
+
+    <!-- MONATSORDNER -->
+    <div class="panel" id="p-months">
+      <div id="folders-v">
+        <div class="toolbar"><span class="sp hint">Jeder Monat ist ein eigener Ordner. Öffnen zum Bearbeiten, Löschen oder Exportieren.</span><button class="btn" onclick="openEdit(null)">+ Eintrag</button></div>
+        <div class="folders" id="folders"></div>
+      </div>
+      <div id="month-v" style="display:none">
+        <div class="toolbar"><button class="btn ghost" onclick="closeMonth()">← Alle Ordner</button></div>
+        <div class="mhead" id="m-title"></div>
+        <div class="box">
+          <div class="row" style="align-items:end">
+            <div><label for="m-ma" style="margin-top:0">Mitarbeiter</label><select id="m-ma" onchange="renderMonth()"></select></div>
+            <div class="toolbar" style="margin:0;justify-content:flex-end">
+              <button class="btn" onclick="openEdit(null)">+ Eintrag</button>
+              <button class="btn amber" onclick="exportMonth()">Excel</button>
+            </div>
+          </div>
+          <div class="sum" id="m-sum"></div>
+          <div id="m-permat"></div>
+        </div>
+        <div class="box scrollx" id="m-list"></div>
+        <button class="btn danger" onclick="deleteMonth()" id="m-del">Ordner löschen</button>
+      </div>
+    </div>
+
+    <!-- EXPORT -->
+    <div class="panel" id="p-export">
+      <div class="box">
+        <h2>Excel erstellen</h2>
+        <div class="row">
+          <div><label for="x-from">Von</label><input type="date" id="x-from"></div>
+          <div><label for="x-to">Bis</label><input type="date" id="x-to"></div>
+        </div>
+        <div class="chips">
+          <button class="chip" onclick="quick(0)">Dieser Monat</button>
+          <button class="chip" onclick="quick(-1)">Letzter Monat</button>
+          <button class="chip" onclick="quickYear()">Dieses Jahr</button>
+        </div>
+        <label for="x-ma">Mitarbeiter</label>
+        <select id="x-ma"></select>
+        <label for="x-mode">Format</label>
+        <select id="x-mode">
+          <option value="one">Eine Excel-Datei (ein Blatt pro Mitarbeiter)</option>
+          <option value="zip">ZIP: ein Ordner pro Monat, darin eine Excel pro Mitarbeiter</option>
+        </select>
+        <button class="btn full amber" id="x-btn" onclick="doExport()">Excel herunterladen</button>
+        <div class="err" id="x-err"></div>
+        <p class="hint" style="margin-top:12px">Jede Zeile: Datum, Kommen, Gehen, Pausenzeiten, Pause und Arbeitszeit. Unten stehen Gesamtstunden und Gesamtpause.</p>
+      </div>
+    </div>
+
+    <!-- EINSTELLUNGEN -->
+    <div class="panel" id="p-set">
+      <div class="box">
+        <h2>Link für Mitarbeiter</h2>
+        <p class="hint">Die Adresse ist schon eingetragen. Der Link verbindet die App automatisch, Mitarbeiter müssen nichts einrichten.</p>
+        <label for="ma-url">Adresse der Mitarbeiter-App</label>
+        <input id="ma-url" placeholder="https://deine-seite.vercel.app" oninput="makeLink()">
+        <div class="link" id="ma-link" style="display:none"></div>
+        <div class="toolbar" style="margin-top:10px"><button class="btn" onclick="copyLink()">Link kopieren</button></div>
+      </div>
+      <div class="box">
+        <h2>Admin-PIN ändern</h2>
+        <div class="row">
+          <div><label for="np1">Neue PIN</label><input id="np1" type="password" inputmode="numeric" maxlength="8"></div>
+          <div><label for="np2">Wiederholen</label><input id="np2" type="password" inputmode="numeric" maxlength="8"></div>
+        </div>
+        <button class="btn full" onclick="changePin()">PIN speichern</button>
+        <div class="err" id="np-err"></div>
+      </div>
+      <div class="box">
+        <h2>Datenbank-Verbindung</h2>
+        <p class="hint" id="cfg-info"></p>
+        <button class="btn ghost full" onclick="resetCfg()">Verbindung neu einrichten</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BEARBEITEN -->
+<div class="modal" id="modal" onclick="if(event.target===this)closeEdit()">
+  <div class="sheet">
+    <h2 id="e-title" style="font-size:20px;margin-bottom:4px">Eintrag</h2>
+    <label for="e-ma">Mitarbeiter</label><select id="e-ma"></select>
+    <label for="e-d">Datum</label><input type="date" id="e-d">
+    <div class="row">
+      <div><label for="e-in">Kommen</label><input type="time" id="e-in"></div>
+      <div><label for="e-out">Gehen</label><input type="time" id="e-out"></div>
+    </div>
+    <label>Pausen</label>
+    <div id="e-p"></div>
+    <button class="btn ghost" style="margin-top:8px" onclick="addPauseRow('','')">+ Pause</button>
+    <label for="e-note">Notiz</label><input id="e-note">
+    <div class="err" id="e-err"></div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn ghost" onclick="closeEdit()">Abbrechen</button>
+      <button class="btn" onclick="saveEdit()">Speichern</button>
+    </div>
+    <button class="btn danger full" id="e-del" onclick="delEntry(editId)">Eintrag löschen</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const hm=iso=>{if(!iso)return'';const d=new Date(iso);return pad(d.getHours())+':'+pad(d.getMinutes())};
+const fmt=m=>{m=Math.max(0,Math.round(m||0));return Math.floor(m/60)+':'+pad(m%60)};
+const dec=m=>(Math.round((m||0)/60*100)/100).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const dDE=s=>{const [y,m,d]=s.split('-');return `${d}.${m}.${y}`};
+const WD=['So','Mo','Di','Mi','Do','Fr','Sa'];
+const wd=s=>WD[new Date(s+'T12:00').getDay()];
+const mins=(a,b)=>(new Date(b)-new Date(a))/60000;
+const monthName=k=>{const [y,m]=k.split('-').map(Number);const s=new Date(y,m-1,1).toLocaleDateString('de-DE',{month:'long',year:'numeric'});return s.charAt(0).toUpperCase()+s.slice(1)};
+const monthEnd=k=>{const [y,m]=k.split('-').map(Number);return ymd(new Date(y,m,0))};
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let sb=null, MA=[], curMonth=null, monthData=[], editId=null;
+
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),2600)}
+function show(s){document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('on',x.id==='s-'+s))}
+function getCfg(){const z=window.ZE_CONFIG||{};if(z.url&&z.key)return {url:z.url.replace(/\/+$/,''),key:z.key};try{return JSON.parse(localStorage.getItem('ptn_cfg')||'null')}catch(e){return null}}
+function errText(e){if(!e)return'';const m=e.message||String(e);if(/fetch/i.test(m))return'Keine Verbindung. Internet und Supabase-URL prüfen.';if(/Invalid API key|JWT|apikey/i.test(m))return'Supabase-Key ist falsch. Den „anon public“ oder „publishable“ Key nehmen.';if(/pausen/i.test(m)&&/exist|schema cache|relationship/i.test(m))return'Tabelle „pausen“ fehlt. Bitte SQL-SETUP.txt in Supabase ausführen (siehe SQL-SETUP.txt).';return m}
+
+function pauseMin(e){const p=e.pausen||[];if(p.length)return p.reduce((s,x)=>s+mins(x.start_time,x.end_time||new Date()),0);return e.pause_min||0}
+function workMin(e){if(!e.start_time)return 0;return Math.max(0,mins(e.start_time,e.end_time||new Date())-pauseMin(e))}
+function pauseText(e){const p=(e.pausen||[]).slice().sort((a,b)=>a.start_time.localeCompare(b.start_time));if(p.length)return p.map(x=>hm(x.start_time)+'–'+(x.end_time?hm(x.end_time):'…')).join(', ');return e.pause_min?e.pause_min+' Min':''}
+
+async function fetchAll(build){let out=[],from=0;for(;;){const {data,error}=await build().range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)break;from+=1000}return out}
+function qEntries(from,to,maId){return fetchAll(()=>{let q=sb.from('pt_zeiten').select('*,pausen:pt_pausen(*)').gte('datum',from).lte('datum',to).order('datum').order('start_time');if(maId)q=q.eq('mitarbeiter_id',maId);return q})}
+
+/* ---------- Start ---------- */
+async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('ptn-polat:'+s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+function init(){
+  const c=getCfg();
+  if(!c){show('setup');return}
+  sb=supabase.createClient(c.url,c.key);
+  if(sessionStorage.getItem('ptn_unlocked')==='1'){enterApp();return}
+  const has=!!localStorage.getItem('ptn_admin_pin');
+  $('pin-hint').textContent=has?'PIN eingeben':'Neue Admin-PIN festlegen (4–8 Ziffern)';
+  $('pin2-w').style.display=has?'none':'block';
+  $('pin-btn').textContent=has?'Entsperren':'PIN festlegen';
+  show('pin');setTimeout(()=>$('pin1').focus(),100);
+}
+$('pin1').addEventListener('keydown',e=>{if(e.key==='Enter')pinGo()});
+async function pinGo(){
+  const p=$('pin1').value.trim(), stored=localStorage.getItem('ptn_admin_pin');$('pin-err').textContent='';
+  if(!/^\d{4,8}$/.test(p)){$('pin-err').textContent='PIN muss 4–8 Ziffern haben.';return}
+  if(!stored){
+    if(p!==$('pin2').value.trim()){$('pin-err').textContent='Die PINs sind nicht gleich.';return}
+    localStorage.setItem('ptn_admin_pin',await sha(p));
+  }else if(await sha(p)!==stored){$('pin-err').textContent='PIN falsch.';$('pin1').value='';return}
+  sessionStorage.setItem('ptn_unlocked','1');$('pin1').value='';$('pin2').value='';enterApp();
+}
+function lock(){sessionStorage.removeItem('ptn_unlocked');init()}
+async function saveConfig(){
+  const url=$('c-url').value.trim().replace(/\/+$/,''), key=$('c-key').value.trim();$('c-err').textContent='';
+  if(!/^https:\/\/.+/.test(url)||!key){$('c-err').textContent='URL und Key eintragen.';return}
+  $('c-save').disabled=true;
+  try{
+    const t=supabase.createClient(url,key);
+    let r=await t.from('pt_mitarbeiter').select('id').limit(1);if(r.error)throw r.error;
+    r=await t.from('pt_pausen').select('id').limit(1);if(r.error)throw r.error;
+    localStorage.setItem('ptn_cfg',JSON.stringify({url,key}));init();
+  }catch(e){$('c-err').textContent=errText(e)}
+  $('c-save').disabled=false;
+}
+function resetCfg(){if(!confirm('Verbindung neu einrichten? Daten in Supabase bleiben erhalten.'))return;localStorage.removeItem('ptn_cfg');sessionStorage.removeItem('ptn_unlocked');init()}
+
+async function enterApp(){
+  show('app');
+  const c=getCfg();$('cfg-info').textContent='Verbunden mit '+c.url;
+  $('ma-url').value=localStorage.getItem('ptn_ma_url')||location.origin;makeLink();
+  quick(0);
+  await loadMA();loadLive();
+  setInterval(()=>{if($('p-live').classList.contains('on')&&!document.hidden)loadLive()},60000);
+}
+function tab(t){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+t));
+  if(t==='live')loadLive(); if(t==='months'&&!curMonth)loadFolders();
+}
+async function loadMA(){
+  const {data,error}=await sb.from('pt_mitarbeiter').select('id,name').order('name');
+  if(error){toast(errText(error));return}
+  MA=data;
+  const opts='<option value="">Alle Mitarbeiter</option>'+MA.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('');
+  const keep=[$('x-ma').value,$('m-ma').value];
+  $('x-ma').innerHTML=opts;$('m-ma').innerHTML=opts;$('x-ma').value=keep[0];$('m-ma').value=keep[1];
+  $('e-ma').innerHTML=MA.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('');
+}
+const maName=id=>(MA.find(m=>m.id==id)||{}).name;
+
+/* ---------- Heute ---------- */
+async function loadLive(){
+  const today=ymd(new Date());
+  $('live-d').textContent=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
+  try{
+    const [a,b]=await Promise.all([
+      sb.from('pt_zeiten').select('*,pausen:pt_pausen(*)').eq('datum',today).order('start_time'),
+      sb.from('pt_zeiten').select('*,pausen:pt_pausen(*)').in('status',['working','pause']).lt('datum',today)
+    ]);
+    if(a.error)throw a.error;if(b.error)throw b.error;
+    const all=b.data.concat(a.data), by={};
+    all.forEach(e=>{(by[e.mitarbeiter_id]=by[e.mitarbeiter_id]||[]).push(e)});
+    const rows=MA.map(m=>{
+      const l=by[m.id]||[];
+      const run=l.find(e=>e.status==='working'||e.status==='pause');
+      const st=run?run.status:(l.length?'done':'off');
+      const lbl={working:'Arbeitet',pause:'Pause',done:'Feierabend',off:'Nicht da'}[st];
+      const w=l.reduce((s,e)=>s+workMin(e),0);
+      const sub=l.map(e=>`${hm(e.start_time)}–${e.end_time?hm(e.end_time):'läuft'}${pauseText(e)?' (Pause '+pauseText(e)+')':''}`).join(' · ');
+      return {st,html:`<div class="live"><b>${esc(m.name)}</b><span class="badge ${st}">${lbl}</span>${l.length?`<div class="sub">${sub} · Arbeitszeit ${fmt(w)} Std</div>`:''}</div>`};
+    });
+    const order={working:0,pause:1,done:2,off:3};
+    rows.sort((x,y)=>order[x.st]-order[y.st]);
+    $('live').innerHTML=rows.length?rows.map(r=>r.html).join(''):'<p class="hint">Noch keine Mitarbeiter. Sie erscheinen, sobald sie sich in der Mitarbeiter-App anmelden.</p>';
+  }catch(e){$('live').innerHTML=`<div class="err">${esc(errText(e))}</div>`}
+}
+
+/* ---------- Monatsordner ---------- */
+async function loadFolders(){
+  $('folders').innerHTML='<p class="hint">Lädt…</p>';
+  try{
+    const data=await fetchAll(()=>sb.from('pt_zeiten').select('id,datum,mitarbeiter_id,start_time,end_time,pause_min').order('datum',{ascending:false}));
+    const g={};
+    data.forEach(e=>{const k=e.datum.slice(0,7);const x=g[k]=g[k]||{n:0,ma:new Set(),w:0};x.n++;x.ma.add(e.mitarbeiter_id);if(e.end_time)x.w+=Math.max(0,mins(e.start_time,e.end_time)-(e.pause_min||0))});
+    const keys=Object.keys(g).sort().reverse();
+    $('folders').innerHTML=keys.length?keys.map(k=>`<button class="folder" onclick="openMonth('${k}')"><div class="mname">${monthName(k)}</div><div class="meta">${g[k].ma.size} Mitarbeiter, ${g[k].n} Einträge</div><div class="hrs">${fmt(g[k].w)} Std gesamt</div></button>`).join(''):'<p class="hint">Noch keine Einträge. Sobald jemand stempelt, entsteht hier der Ordner für den Monat.</p>';
+  }catch(e){$('folders').innerHTML=`<div class="err">${esc(errText(e))}</div>`}
+}
+async function openMonth(k){
+  curMonth=k;$('folders-v').style.display='none';$('month-v').style.display='block';
+  $('m-title').textContent=monthName(k);$('m-list').innerHTML='<p class="hint">Lädt…</p>';
+  try{monthData=await qEntries(k+'-01',monthEnd(k));renderMonth()}catch(e){$('m-list').innerHTML=`<div class="err">${esc(errText(e))}</div>`}
+}
+function closeMonth(){curMonth=null;$('month-v').style.display='none';$('folders-v').style.display='block';loadFolders()}
+function renderMonth(){
+  const f=$('m-ma').value, list=monthData.filter(e=>!f||e.mitarbeiter_id==f);
+  const W=list.reduce((s,e)=>s+workMin(e),0), P=list.reduce((s,e)=>s+pauseMin(e),0);
+  const days=new Set(list.map(e=>e.mitarbeiter_id+'|'+e.datum)).size;
+  $('m-sum').innerHTML=`<div><b>${fmt(W)} Std</b>Gesamtstunden (${dec(W)})</div><div><b>${fmt(P)} Std</b>Gesamtpause</div><div><b>${days}</b>Arbeitstage</div>`;
+  $('m-del').textContent=f?`Ordner für ${maName(f)} löschen`:'Ganzen Ordner löschen';
+  if(!f){
+    const per={};list.forEach(e=>{const x=per[e.mitarbeiter_id]=per[e.mitarbeiter_id]||{w:0,p:0,n:e.mitarbeiter_name};x.w+=workMin(e);x.p+=pauseMin(e)});
+    const ids=Object.keys(per).sort((a,b)=>(maName(a)||per[a].n).localeCompare(maName(b)||per[b].n));
+    $('m-permat').innerHTML=ids.length?`<div class="permat"><span class="h">Mitarbeiter</span><span class="h">Stunden</span><span class="h">Pause</span>${ids.map(i=>`<span>${esc(maName(i)||per[i].n)}</span><span>${fmt(per[i].w)}</span><span>${fmt(per[i].p)}</span>`).join('')}</div>`:'';
+  }else $('m-permat').innerHTML='';
+  if(!list.length){$('m-list').innerHTML='<p class="hint">Keine Einträge.</p>';return}
+  $('m-list').innerHTML=`<table class="tbl"><thead><tr><th>Datum</th>${f?'':'<th>Mitarbeiter</th>'}<th>Kommen</th><th>Gehen</th><th>Pausen</th><th class="r">Pause</th><th class="r">Arbeitszeit</th><th></th></tr></thead><tbody>${
+    list.map(e=>`<tr><td>${wd(e.datum)} ${dDE(e.datum)}</td>${f?'':`<td class="c-name">${esc(maName(e.mitarbeiter_id)||e.mitarbeiter_name)}</td>`}<td>${hm(e.start_time)}</td><td>${e.end_time?hm(e.end_time):'läuft'}</td><td class="c-pause">${esc(pauseText(e))||'–'}${e.notiz?'<br>'+esc(e.notiz):''}</td><td class="r">${fmt(pauseMin(e))}</td><td class="r"><b>${fmt(workMin(e))}</b></td><td class="c-act"><div class="act"><button onclick="openEdit(${e.id})">Bearbeiten</button><button class="del" onclick="delEntry(${e.id})">Löschen</button></div></td></tr>`).join('')
+  }</tbody><tfoot><tr><td colspan="${f?4:5}">Gesamt</td><td class="r">${fmt(P)}</td><td class="r">${fmt(W)}</td><td></td></tr></tfoot></table>`;
+}
+async function deleteMonth(){
+  const f=$('m-ma').value, who=f?maName(f):'alle Mitarbeiter';
+  if(!confirm(`${monthName(curMonth)} für ${who} löschen?\nAlle Einträge darin werden endgültig gelöscht.`))return;
+  if(!confirm('Wirklich endgültig löschen? Das geht nicht rückgängig.'))return;
+  let q=sb.from('pt_zeiten').delete().gte('datum',curMonth+'-01').lte('datum',monthEnd(curMonth));
+  if(f)q=q.eq('mitarbeiter_id',f);
+  const {error}=await q;
+  if(error){toast(errText(error));return}
+  toast('Ordner gelöscht');
+  if(f){$('m-ma').value='';openMonth(curMonth)}else closeMonth();
+}
+function exportMonth(){exportExcel(curMonth+'-01',monthEnd(curMonth),$('m-ma').value,'one')}
+
+/* ---------- Bearbeiten ---------- */
+function addPauseRow(a,b){
+  const d=document.createElement('div');d.className='prow';
+  d.innerHTML=`<div><label>Von</label><input type="time" value="${a}"></div><div><label>Bis</label><input type="time" value="${b}"></div><button onclick="this.parentNode.remove()" aria-label="Pause entfernen">✕</button>`;
+  $('e-p').appendChild(d);
+}
+function openEdit(id){
+  editId=id;$('e-err').textContent='';$('e-p').innerHTML='';
+  const e=id?monthData.find(x=>x.id===id):null;
+  $('e-title').textContent=e?'Eintrag bearbeiten':'Neuer Eintrag';
+  $('e-del').style.display=e?'flex':'none';
+  if(e){
+    $('e-ma').value=e.mitarbeiter_id;$('e-d').value=e.datum;$('e-in').value=hm(e.start_time);$('e-out').value=hm(e.end_time);$('e-note').value=e.notiz||'';
+    (e.pausen||[]).slice().sort((a,b)=>a.start_time.localeCompare(b.start_time)).forEach(p=>addPauseRow(hm(p.start_time),hm(p.end_time)));
+  }else{
+    const f=$('m-ma').value;if(f)$('e-ma').value=f;
+    $('e-d').value=curMonth&&!ymd(new Date()).startsWith(curMonth)?curMonth+'-01':ymd(new Date());
+    $('e-in').value='';$('e-out').value='';$('e-note').value='';
+  }
+  $('modal').classList.add('on');
+}
+function closeEdit(){$('modal').classList.remove('on')}
+async function saveEdit(){
+  const ma=$('e-ma').value,d=$('e-d').value,i=$('e-in').value,o=$('e-out').value;$('e-err').textContent='';
+  if(!ma||!d||!i){$('e-err').textContent='Mitarbeiter, Datum und Kommen eintragen.';return}
+  const start=new Date(d+'T'+i);let end=o?new Date(d+'T'+o):null;
+  if(end&&end<=start)end.setDate(end.getDate()+1);
+  const pausen=[];
+  for(const r of $('e-p').querySelectorAll('.prow')){
+    const [x,y]=[...r.querySelectorAll('input')].map(n=>n.value);
+    if(!x&&!y)continue;
+    if(!x||!y){$('e-err').textContent='Bei jeder Pause Von und Bis eintragen.';return}
+    const a=new Date(d+'T'+x),b=new Date(d+'T'+y);
+    if(a<start)a.setDate(a.getDate()+1);if(b<=a)b.setDate(b.getDate()+1);
+    if(end&&b>end){$('e-err').textContent=`Pause ${x}–${y} liegt nicht zwischen Kommen und Gehen.`;return}
+    pausen.push({start_time:a.toISOString(),end_time:b.toISOString()});
+  }
+  const tmp={start_time:start.toISOString(),end_time:end?end.toISOString():null,pausen};
+  const row={mitarbeiter_id:Number(ma),mitarbeiter_name:maName(ma),datum:d,start_time:tmp.start_time,end_time:tmp.end_time,status:end?'done':'working',pause_start:null,pause_min:Math.round(pauseMin(tmp)),dauer_min:end?Math.round(workMin(tmp)):null,notiz:$('e-note').value.trim()||null};
+  try{
+    let id=editId;
+    if(id){const r=await sb.from('pt_zeiten').update(row).eq('id',id);if(r.error)throw r.error;const r2=await sb.from('pt_pausen').delete().eq('eintrag_id',id);if(r2.error)throw r2.error}
+    else{const r=await sb.from('pt_zeiten').insert({...row,manuell:true}).select('id').single();if(r.error)throw r.error;id=r.data.id}
+    if(pausen.length){const r=await sb.from('pt_pausen').insert(pausen.map(p=>({...p,eintrag_id:id})));if(r.error)throw r.error}
+    closeEdit();toast('Gespeichert');
+    const k=d.slice(0,7);
+    if(curMonth){openMonth(curMonth===k?curMonth:k)}else{tab('months');openMonth(k)}
+  }catch(e){$('e-err').textContent=errText(e)}
+}
+async function delEntry(id){
+  if(!id||!confirm('Diesen Eintrag endgültig löschen?'))return;
+  const {error}=await sb.from('pt_zeiten').delete().eq('id',id);
+  if(error){toast(errText(error));return}
+  closeEdit();toast('Eintrag gelöscht');monthData=monthData.filter(e=>e.id!==id);renderMonth();
+}
+
+/* ---------- Excel ---------- */
+function quick(off){const n=new Date();const a=new Date(n.getFullYear(),n.getMonth()+off,1),b=new Date(n.getFullYear(),n.getMonth()+off+1,0);$('x-from').value=ymd(a);$('x-to').value=ymd(b)}
+function quickYear(){const y=new Date().getFullYear();$('x-from').value=y+'-01-01';$('x-to').value=y+'-12-31'}
+async function doExport(){
+  const f=$('x-from').value,t=$('x-to').value;$('x-err').textContent='';
+  if(!f||!t||f>t){$('x-err').textContent='Gültigen Zeitraum wählen (Von vor Bis).';return}
+  exportExcel(f,t,$('x-ma').value,$('x-mode').value);
+}
+const enc=(r,c)=>XLSX.utils.encode_cell({r,c});
+const safeName=s=>String(s).replace(/[\\\/?*\[\]:]/g,'').slice(0,31)||'Blatt';
+const fileName=s=>String(s).replace(/[\\\/?*\[\]:"<>|]/g,'').replace(/\s+/g,'_');
+
+function maSheet(name,list,from,to){
+  const aoa=[[`Zeiterfassung – ${name}`],[`Polat Transfer · Zeitraum ${dDE(from)} bis ${dDE(to)}`],[],
+    ['Datum','Tag','Kommen','Gehen','Pausenzeiten','Pause (Std:Min)','Arbeitszeit (Std:Min)','Arbeitszeit (Std dezimal)','Notiz']];
+  const first=aoa.length;
+  let W=0,P=0;
+  list.forEach(e=>{const p=pauseMin(e),w=workMin(e);W+=w;P+=p;aoa.push([dDE(e.datum),wd(e.datum),hm(e.start_time),e.end_time?hm(e.end_time):'läuft',pauseText(e),p/1440,w/1440,Math.round(w/60*100)/100,e.notiz||''])});
+  const last=aoa.length-1;
+  aoa.push([]);
+  const tr=aoa.length;
+  aoa.push(['Gesamt','','','',(n=>n+(n===1?' Arbeitstag':' Arbeitstage'))(new Set(list.map(e=>e.datum)).size),P/1440,W/1440,Math.round(W/60*100)/100,'']);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  for(let r=first;r<=last;r++){ws[enc(r,5)].z='[h]:mm';ws[enc(r,6)].z='[h]:mm';ws[enc(r,7)].z='0.00'}
+  if(last>=first){
+    ws[enc(tr,5)]={t:'n',v:P/1440,f:`SUM(F${first+1}:F${last+1})`,z:'[h]:mm'};
+    ws[enc(tr,6)]={t:'n',v:W/1440,f:`SUM(G${first+1}:G${last+1})`,z:'[h]:mm'};
+    ws[enc(tr,7)]={t:'n',v:Math.round(W/60*100)/100,f:`SUM(H${first+1}:H${last+1})`,z:'0.00'};
+  }
+  ws['!cols']=[{wch:11},{wch:5},{wch:8},{wch:8},{wch:28},{wch:15},{wch:20},{wch:22},{wch:28}];
+  ws['!autofilter']={ref:`A${first}:I${last+1}`};
+  return ws;
+}
+function overviewSheet(groups,from,to){
+  const aoa=[['Zeiterfassung – Übersicht'],[`Polat Transfer · Zeitraum ${dDE(from)} bis ${dDE(to)}`],[],
+    ['Mitarbeiter','Arbeitstage','Gesamtstunden (Std:Min)','Gesamtstunden (dezimal)','Gesamtpause (Std:Min)']];
+  const first=aoa.length;
+  groups.forEach(g=>{const W=g.list.reduce((s,e)=>s+workMin(e),0),P=g.list.reduce((s,e)=>s+pauseMin(e),0);aoa.push([g.name,new Set(g.list.map(e=>e.datum)).size,W/1440,Math.round(W/60*100)/100,P/1440])});
+  const last=aoa.length-1;aoa.push([]);const tr=aoa.length;aoa.push(['Gesamt']);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  for(let r=first;r<=last;r++){ws[enc(r,2)].z='[h]:mm';ws[enc(r,3)].z='0.00';ws[enc(r,4)].z='[h]:mm'}
+  const col=(c,L,z)=>{let v=0;for(let r=first;r<=last;r++)v+=ws[enc(r,c)].v;ws[enc(tr,c)]={t:'n',v,f:`SUM(${L}${first+1}:${L}${last+1})`,z}};
+  col(1,'B','0');col(2,'C','[h]:mm');col(3,'D','0.00');col(4,'E','[h]:mm');
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:tr,c:4}});
+  ws['!cols']=[{wch:24},{wch:12},{wch:22},{wch:22},{wch:22}];
+  return ws;
+}
+function groupByMA(ents){
+  const g={};ents.forEach(e=>{(g[e.mitarbeiter_id]=g[e.mitarbeiter_id]||{name:maName(e.mitarbeiter_id)||e.mitarbeiter_name,list:[]}).list.push(e)});
+  return Object.values(g).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+}
+function buildWb(ents,from,to){
+  const wb=XLSX.utils.book_new(),groups=groupByMA(ents),used=new Set();
+  if(groups.length>1){XLSX.utils.book_append_sheet(wb,overviewSheet(groups,from,to),'Übersicht');used.add('Übersicht')}
+  groups.forEach(g=>{let n=safeName(g.name),i=2;while(used.has(n))n=safeName(g.name).slice(0,28)+' '+i++;used.add(n);XLSX.utils.book_append_sheet(wb,maSheet(g.name,g.list,from,to),n)});
+  return wb;
+}
+const wbBlob=wb=>new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
+
+async function exportExcel(from,to,maId,mode){
+  const btn=$('x-btn');btn.disabled=true;toast('Excel wird erstellt…');
+  try{
+    const ents=await qEntries(from,to,maId);
+    if(!ents.length){toast('Keine Einträge in diesem Zeitraum');btn.disabled=false;return}
+    const who=maId?fileName(maName(maId)):'Alle';
+    if(mode==='one'){
+      const tag=from.slice(0,7)===to.slice(0,7)&&from.endsWith('-01')&&to===monthEnd(from.slice(0,7))?from.slice(0,7):`${from}_bis_${to}`;
+      dl(wbBlob(buildWb(ents,from,to)),`Zeiterfassung_${tag}_${who}.xlsx`);
+    }else{
+      const zip=new JSZip(),byM={};
+      ents.forEach(e=>{(byM[e.datum.slice(0,7)]=byM[e.datum.slice(0,7)]||[]).push(e)});
+      Object.keys(byM).sort().forEach(k=>{
+        const f=k+'-01'<from?from:k+'-01', t=monthEnd(k)>to?to:monthEnd(k);
+        const folder=`${k} ${monthName(k).split(' ')[0]}`, groups=groupByMA(byM[k]);
+        if(groups.length>1)zip.file(`${folder}/Alle_Mitarbeiter_${k}.xlsx`,XLSX.write(buildWb(byM[k],f,t),{bookType:'xlsx',type:'array'}));
+        groups.forEach(g=>zip.file(`${folder}/${fileName(g.name)}_${k}.xlsx`,XLSX.write(buildWb(g.list,f,t),{bookType:'xlsx',type:'array'})));
+      });
+      dl(await zip.generateAsync({type:'blob'}),`Zeiterfassung_${from}_bis_${to}_${who}.zip`);
+    }
+    toast('Download gestartet');
+  }catch(e){toast(errText(e));$('x-err').textContent=errText(e)}
+  btn.disabled=false;
+}
+
+/* ---------- Einstellungen ---------- */
+function makeLink(){
+  const u=$('ma-url').value.trim().replace(/\/+$/,''),c=getCfg(),el=$('ma-link');
+  localStorage.setItem('ptn_ma_url',u);
+  if(!u||!c){el.style.display='none';return ''}
+  const l=`${u}/?u=${encodeURIComponent(c.url)}&k=${encodeURIComponent(c.key)}`;el.textContent=l;el.style.display='block';return l;
+}
+async function copyLink(){const l=makeLink();if(!l){toast('Erst die Adresse der Mitarbeiter-App eintragen');return}
+  try{if(navigator.share){await navigator.share({title:'Zeiterfassung',url:l});return}await navigator.clipboard.writeText(l);toast('Link kopiert')}catch(e){}}
+async function changePin(){
+  const a=$('np1').value.trim(),b=$('np2').value.trim();$('np-err').textContent='';
+  if(!/^\d{4,8}$/.test(a)){$('np-err').textContent='PIN muss 4–8 Ziffern haben.';return}
+  if(a!==b){$('np-err').textContent='Die PINs sind nicht gleich.';return}
+  localStorage.setItem('ptn_admin_pin',await sha(a));$('np1').value='';$('np2').value='';toast('PIN geändert');
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEdit()});
+init();
+</script>
+</body>
+</html>
